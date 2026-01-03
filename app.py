@@ -3,8 +3,10 @@ import os
 from agent.graph import app
 from agent.nodes import get_llm
 from agent.chat import get_chat_response
+from agent.cities import ALL_CITIES
 from langchain_core.messages import HumanMessage
 from dotenv import load_dotenv
+from datetime import datetime, timedelta
 
 # Load environment variables
 load_dotenv()
@@ -92,23 +94,38 @@ if search_mode == "Let AI Suggest Locations":
 
 else:
     # Manual / Classic Mode
-    DEPARTURE_CITIES = ["New York, USA", "London, UK", "Los Angeles, USA", "San Francisco, USA", "Singapore", "Mumbai, India", "Delhi, India", "Sydney, Australia", "Berlin, Germany", "Toronto, Canada", "Other"]
-    
     c1, c2 = st.columns(2)
     with c1:
-        origin_select = st.selectbox("From (Origin)", DEPARTURE_CITIES)
-        origin = st.text_input("Enter Departure City") if origin_select == "Other" else origin_select
+        origin_selection = st.selectbox("From (Origin)", ALL_CITIES + ["Other"])
+        if origin_selection == "Other":
+            origin = st.text_input("Enter Origin City")
+        else:
+            origin = origin_selection
+            
     with c2:
-        # We use a combined list or simple text
-        dest_input = st.selectbox("To (Destination)", st.session_state.suggested_cities + ["Other"])
-        final_destination = st.text_input("Enter Destination") if dest_input == "Other" else dest_input
+        dest_selection = st.selectbox("To (Destination)", ALL_CITIES + ["Other"])
+        if dest_selection == "Other":
+            final_destination = st.text_input("Enter Destination City")
+        else:
+            final_destination = dest_selection
 
 # --- STEP 2: DETAILS ---
 st.subheader("2. Trip Details")
 d1, d2 = st.columns(2)
 
 with d1:
-    dates = st.text_input("Dates", "Oct 1 - Oct 7")
+    today = datetime.today()
+    next_week = today + timedelta(days=7)
+    date_range = st.date_input("Dates", value=(today, next_week), min_value=today)
+    
+    # helper to format dates for the agent
+    if isinstance(date_range, tuple) and len(date_range) == 2:
+        dates = f"{date_range[0].strftime('%b %d')} - {date_range[1].strftime('%b %d')}"
+    elif isinstance(date_range, tuple) and len(date_range) == 1:
+         dates = f"{date_range[0].strftime('%b %d')}"
+    else:
+        dates = str(date_range)
+        
     interests = st.multiselect("Interests", ["Food", "History", "Nature", "Shopping", "Adventure", "Relaxation"], ["Food", "History"])
 
 with d2:
