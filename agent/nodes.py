@@ -8,10 +8,12 @@ import os
 
 def get_llm():
     provider = os.environ.get("LLM_PROVIDER", "OpenAI")
+    model = os.environ.get("LLM_MODEL")
+    
     if provider == "Groq":
-        return ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
+        return ChatGroq(model=model or "llama-3.3-70b-versatile", temperature=0)
     else:
-        return ChatOpenAI(model="gpt-4o-mini", temperature=0)
+        return ChatOpenAI(model=model or "gpt-4o-mini", temperature=0)
 
 def get_tool():
     return TavilySearchResults(max_results=3)

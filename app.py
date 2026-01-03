@@ -32,23 +32,54 @@ def suggest_cities(query):
 
 # Sidebar Settings
 with st.sidebar:
-    st.title("Settings")
-    if os.environ.get("LLM_PROVIDER") == "Groq":
-        st.success(f"Using Groq (Llama 3)")
-    else:
-        if os.environ.get("OPENAI_API_KEY"):
-            st.success("OpenAI Key loaded")
+    st.title("🔑 API Keys")
+    st.markdown("""
+    To use this app, you need to provide your own API keys.
+    The keys are not stored and are only used for this session.
+    """)
+    
+    # Provider Selection
+    provider = st.radio("Select LLM Provider", ["OpenAI", "Groq (Free Tier Available)"], horizontal=True)
+    
+    if provider == "Groq (Free Tier Available)":
+        os.environ["LLM_PROVIDER"] = "Groq"
+        if os.environ.get("GROQ_API_KEY"):
+            st.success("✅ Groq Key loaded from env")
         else:
-            openai_key = st.text_input("OpenAI API Key", type="password")
+            groq_key = st.text_input("Groq API Key", type="password", help="Get a free key: https://console.groq.com/keys")
+            if groq_key:
+                os.environ["GROQ_API_KEY"] = groq_key
+            else:
+                st.warning("⚠️ Groq Key missing")
+        
+        # Groq Models
+        groq_model = st.selectbox("Select Model", ["llama-3.3-70b-versatile", "llama3-70b-8192", "mixtral-8x7b-32768", "gemma2-9b-it"])
+        os.environ["LLM_MODEL"] = groq_model
+    else:
+        os.environ["LLM_PROVIDER"] = "OpenAI"
+        if os.environ.get("OPENAI_API_KEY"):
+            st.success("✅ OpenAI Key loaded from env")
+        else:
+            openai_key = st.text_input("OpenAI API Key", type="password", help="Get key: https://platform.openai.com/api-keys")
             if openai_key:
                 os.environ["OPENAI_API_KEY"] = openai_key
+            else:
+                st.warning("⚠️ OpenAI Key missing")
+        
+        # OpenAI Models
+        openai_model = st.selectbox("Select Model", ["gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo"])
+        os.environ["LLM_MODEL"] = openai_model
 
+    st.markdown("---")
+    st.markdown("### Search Provider")
     if os.environ.get("TAVILY_API_KEY"):
-        st.success("Tavily Key loaded")
+        st.success("✅ Tavily Key loaded from env")
     else:
-        tavily_key = st.text_input("Tavily API Key", type="password")
+        tavily_key = st.text_input("Tavily API Key", type="password", help="Get free key: https://tavily.com/")
         if tavily_key:
             os.environ["TAVILY_API_KEY"] = tavily_key
+        else:
+            st.warning("⚠️ Tavily Key missing (Required for research)")
             
     st.markdown("---")
     st.info("💡 **Tip**: Be specific with your budget for better validation.")

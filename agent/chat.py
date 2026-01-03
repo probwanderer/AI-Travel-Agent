@@ -7,11 +7,13 @@ import os
 def get_chat_llm():
     """Returns the LLM instance based on environment configuration."""
     provider = os.environ.get("LLM_PROVIDER", "OpenAI")
+    model = os.environ.get("LLM_MODEL")
+    
     if provider == "Groq":
         # Using a versatile model for chat
-        return ChatGroq(model="llama-3.3-70b-versatile", temperature=0.7)
+        return ChatGroq(model=model or "llama-3.3-70b-versatile", temperature=0.7)
     else:
-        return ChatOpenAI(model="gpt-4o-mini", temperature=0.7)
+        return ChatOpenAI(model=model or "gpt-4o-mini", temperature=0.7)
 
 def get_chat_response(messages, itinerary_context):
     """
