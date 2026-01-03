@@ -2,6 +2,7 @@ import streamlit as st
 import os
 from agent.graph import app
 from agent.nodes import get_llm
+from agent.chat import get_chat_response
 from langchain_core.messages import HumanMessage
 from dotenv import load_dotenv
 
@@ -53,6 +54,13 @@ with st.sidebar:
 # Session State for Cities
 if "suggested_cities" not in st.session_state:
     st.session_state.suggested_cities = ["Tokyo, Japan", "Paris, France", "New York, USA", "London, UK", "Rome, Italy"]
+
+# Session State for Chat
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+if "final_itinerary" not in st.session_state:
+    st.session_state.final_itinerary = None
 
 # Main Layout
 st.title("✈️ AI Travel Agent")
@@ -114,7 +122,13 @@ with d2:
     final_budget = f"{budget_amount} {currency}"
 
 # --- EXECUTION ---
+
+# --- EXECUTION ---
 if st.button("🚀 Plan My Trip"):
+    # Reset Chat History on new plan
+    st.session_state.messages = []
+    st.session_state.final_itinerary = None
+    
     # Check Logic
     has_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("GROQ_API_KEY")
     orig = origin if search_mode == "Select from List" else "Your Location" 
@@ -157,8 +171,40 @@ if st.button("🚀 Plan My Trip"):
                                 status_container.warning(f"🤔 **Refining**: {critique}")
                         else:
                              status_container.success("✅ **Validated**: Itinerary approved!")
-                             result_container.markdown(value.get("final_itinerary"))
+                             st.session_state.final_itinerary = value.get("final_itinerary")
+                             result_container.markdown(st.session_state.final_itinerary)
                              
         except Exception as e:
             st.error(f"An error occurred: {e}")
+
+# --- DISPLAY ITINERARY ---
+if st.session_state.final_itinerary:
+    st.markdown(st.session_state.final_itinerary)
+
+# --- CHAT INTERFACE ---
+if st.session_state.final_itinerary:
+    st.markdown("---")
+    st.subheader("💬 Ask about your trip")
+    
+    # Display chat messages
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+    # Chat Input
+    if prompt := st.chat_input("Ask a follow-up question (e.g., 'What's the weather?', 'Find veg food nearby')"):
+        # Add user message to history
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
+
+        # Generate Agent Response
+        with st.chat_message("assistant"):
+            with st.spinner("Thinking..."):
+                response = get_chat_response(st.session_state.messages, st.session_state.final_itinerary)
+                st.markdown(response)
+        
+        # Add assistant response to history
+        st.session_state.messages.append({"role": "assistant", "content": response})
+
 
