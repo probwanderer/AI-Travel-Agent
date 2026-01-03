@@ -3,8 +3,8 @@ import os
 from agent.graph import app
 from agent.nodes import get_llm
 from agent.chat import get_chat_response
-from agent.cities import ALL_CITIES
 from langchain_core.messages import HumanMessage
+import requests
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
 
@@ -30,6 +30,31 @@ def suggest_cities(query):
     res = llm.invoke([msg])
     return [c.strip() for c in res.content.split(',')]
 
+# --- API HELPERS ---
+@st.cache_data(ttl=3600*24) # Cache for 24h
+def get_all_countries():
+    try:
+        url = "https://countriesnow.space/api/v0.1/countries/positions"
+        response = requests.get(url)
+        data = response.json()
+        if not data.get("error"):
+            return sorted([item["name"] for item in data["data"]])
+        return []
+    except:
+        return []
+
+@st.cache_data(ttl=3600*24)
+def get_cities_for_country(country):
+    try:
+        url = "https://countriesnow.space/api/v0.1/countries/cities"
+        response = requests.post(url, json={"country": country})
+        data = response.json()
+        if not data.get("error"):
+            return sorted(data["data"])
+        return []
+    except:
+        return []
+
 # Sidebar Settings
 with st.sidebar:
     st.title("🔑 API Keys")
@@ -39,9 +64,9 @@ with st.sidebar:
     """)
     
     # Provider Selection
-    provider = st.radio("Select LLM Provider", ["OpenAI", "Groq (Free Tier Available)"], horizontal=True)
+    provider = st.radio("Select LLM Provider", ["OpenAI", "Groq"], horizontal=True)
     
-    if provider == "Groq (Free Tier Available)":
+    if provider == "Groq":
         os.environ["LLM_PROVIDER"] = "Groq"
         if os.environ.get("GROQ_API_KEY"):
             st.success("✅ Groq Key loaded from env")
@@ -124,21 +149,47 @@ if search_mode == "Let AI Suggest Locations":
     final_destination = st.selectbox("Select Suggested Destination", st.session_state.suggested_cities)
 
 else:
-    # Manual / Classic Mode
-    c1, c2 = st.columns(2)
-    with c1:
-        origin_selection = st.selectbox("From (Origin)", ALL_CITIES + ["Other"])
-        if origin_selection == "Other":
+    # Manual / Classic Mode (Dynamic)
+    col1, col2 = st.columns(2)
+    
+    # --- Origin Selection ---
+    with col1:
+        st.markdown("### From (Origin)")
+        countries = get_all_countries()
+        if not countries:
+            # Fallback if API fails
             origin = st.text_input("Enter Origin City")
         else:
-            origin = origin_selection
+            o_country = st.selectbox("Select Country", countries, key="o_country")
+            o_cities = get_cities_for_country(o_country)
             
-    with c2:
-        dest_selection = st.selectbox("To (Destination)", ALL_CITIES + ["Other"])
-        if dest_selection == "Other":
-            final_destination = st.text_input("Enter Destination City")
+            if o_cities:
+                o_city = st.selectbox("Select City", o_cities + ["Other"], key="o_city")
+                if o_city == "Other":
+                    origin = st.text_input("Enter Origin City", key="o_custom")
+                else:
+                    origin = f"{o_city}, {o_country}"
+            else:
+                 origin = st.text_input("Enter Origin City", key="o_fallback")
+
+    # --- Destination Selection ---
+    with col2:
+        st.markdown("### To (Destination)")
+        # Re-use cached countries
+        if not countries:
+             final_destination = st.text_input("Enter Destination City")
         else:
-            final_destination = dest_selection
+            d_country = st.selectbox("Select Country", countries, key="d_country", index=min(10, len(countries)-1)) # Default to mixed
+            d_cities = get_cities_for_country(d_country)
+            
+            if d_cities:
+                d_city = st.selectbox("Select City", d_cities + ["Other"], key="d_city")
+                if d_city == "Other":
+                     final_destination = st.text_input("Enter Destination City", key="d_custom")
+                else:
+                    final_destination = f"{d_city}, {d_country}"
+            else:
+                final_destination = st.text_input("Enter Destination City", key="d_fallback")
 
 # --- STEP 2: DETAILS ---
 st.subheader("2. Trip Details")
